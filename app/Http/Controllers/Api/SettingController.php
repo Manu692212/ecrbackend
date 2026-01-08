@@ -120,11 +120,16 @@ class SettingController extends Controller
 
     public function getPublicByGroup($group)
     {
-        $settings = Setting::where('group', $group)
-            ->where('is_public', true)
-            ->orderBy('key', 'asc')
-            ->get();
+        try {
+            $settings = Setting::where('group', $group)
+                ->where('is_public', true)
+                ->orderBy('key', 'asc')
+                ->get();
 
-        return response()->json($settings);
+            return response()->json($settings);
+        } catch (\Exception $e) {
+            // Table might not exist yet - return empty array
+            return response()->json([]);
+        }
     }
 }

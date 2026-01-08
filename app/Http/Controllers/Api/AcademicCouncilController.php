@@ -264,11 +264,16 @@ class AcademicCouncilController extends Controller
 
     public function publicList()
     {
-        $councils = AcademicCouncil::where('is_active', true)
-            ->orderBy('order', 'asc')
-            ->get();
+        try {
+            $councils = AcademicCouncil::where('is_active', true)
+                ->orderBy('order', 'asc')
+                ->get();
 
-        return response()->json($councils);
+            return response()->json($councils);
+        } catch (\Exception $e) {
+            // Table might not exist yet - return empty array
+            return response()->json([]);
+        }
     }
 
     public function download(Request $request)

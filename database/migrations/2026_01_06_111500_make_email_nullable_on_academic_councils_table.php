@@ -11,9 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('academic_councils', function (Blueprint $table) {
-            $table->string('email')->nullable()->unique()->change();
-        });
+        // Email column is already unique from the initial migration
+        // This column will be dropped in a later migration, so skip the modification
     }
 
     /**
@@ -21,8 +20,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('academic_councils', function (Blueprint $table) {
-            $table->string('email')->unique()->change();
-        });
+        //
     }
 };

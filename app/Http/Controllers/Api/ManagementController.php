@@ -217,11 +217,16 @@ class ManagementController extends Controller
 
     public function publicList()
     {
-        $management = Management::where('is_active', true)
-            ->orderBy('order', 'asc')
-            ->get();
+        try {
+            $management = Management::where('is_active', true)
+                ->orderBy('order', 'asc')
+                ->get();
 
-        return response()->json($management);
+            return response()->json($management);
+        } catch (\Exception $e) {
+            // Table might not exist yet - return empty array
+            return response()->json([]);
+        }
     }
 
     public function download(Request $request)

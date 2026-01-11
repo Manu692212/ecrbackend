@@ -12,8 +12,19 @@ class AcademicCouncil extends Model
 
     protected $fillable = [
         'name',
+        'position',
+        'email',
+        'phone',
         'designation',
-        'qualification',
+        'bio',
+        'qualifications',
+        'image',
+        'image_size',
+        'image_width',
+        'image_height',
+        'department',
+        'order',
+        'is_active',
     ];
 
     public $timestamps = true;

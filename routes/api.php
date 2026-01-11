@@ -79,6 +79,7 @@ Route::middleware('api')->group(function () {
         
         // Facility routes
         Route::apiResource('facilities', FacilityController::class);
+        Route::post('facilities/{id}/upload-image', [FacilityController::class, 'uploadImage']);
         
         // Settings routes
         Route::apiResource('settings', SettingController::class);

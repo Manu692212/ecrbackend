@@ -133,6 +133,32 @@ class FacilityController extends Controller
         return response()->json(['message' => 'Facility deleted successfully']);
     }
 
+    public function uploadImage(Request $request, string $id)
+    {
+        $facility = Facility::findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'image' => ['required', 'image', 'mimes:jpg,jpeg,png,gif,webp', 'max:4096'],
+        ]);
+
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+
+        if ($facility->image) {
+            Storage::disk('public')->delete($facility->image);
+        }
+
+        $path = $request->file('image')->store('facilities', 'public');
+
+        $facility->update(['image' => $path]);
+
+        return response()->json([
+            'message' => 'Facility image uploaded successfully',
+            'facility' => $facility,
+        ]);
+    }
+
     public function publicList()
     {
         try {

@@ -24,7 +24,7 @@ Route::middleware('api')->group(function () {
     Route::get('public/facilities', [FacilityController::class, 'publicList']);
     
     // Protected routes
-    Route::middleware(['auth.api'])->group(function () {
+    Route::middleware('auth:sanctum')->group(function () {
         // Admin routes
         Route::apiResource('admins', AdminController::class);
         

@@ -23,15 +23,21 @@ Route::get('/test', function () {
 Route::get('/media/{path}', function (string $path) {
     $normalized = ltrim($path, '/');
 
+    $headers = [
+        'Access-Control-Allow-Origin' => '*',
+        'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
+        'Access-Control-Allow-Headers' => 'Origin, Content-Type, Accept',
+    ];
+
     if (!Storage::disk('public')->exists($normalized)) {
-        abort(404);
+        return response('File not found', 404)->withHeaders($headers);
     }
 
     $response = Storage::disk('public')->response($normalized);
 
-    $response->headers->set('Access-Control-Allow-Origin', '*');
-    $response->headers->set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    $response->headers->set('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept');
+    foreach ($headers as $key => $value) {
+        $response->headers->set($key, $value);
+    }
 
     return $response;
 })->where('path', '.*');

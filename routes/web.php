@@ -40,11 +40,3 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::view('/', 'admin')->name('dashboard');
     Route::resource('facilities', AdminFacilityController::class)->except(['show']);
 });
-
-// Login route for frontend authentication
-Route::get('/login', function () {
-    return response()->json([
-        'message' => 'Login endpoint',
-        'instructions' => 'Use POST /api/admins/login for authentication'
-    ]);
-})->name('login');

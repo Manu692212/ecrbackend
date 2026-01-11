@@ -34,8 +34,8 @@
 </div>
 
 <div>
-    <label class="block text-sm font-medium text-gray-700 mb-1 mt-6">Description *</label>
-    <textarea name="description" rows="4" required
+    <label class="block text-sm font-medium text-gray-700 mb-1 mt-6">Description</label>
+    <textarea name="description" rows="4"
               class="w-full rounded-lg border-gray-300 focus:ring-emerald-500 focus:border-emerald-500">{{ old('description', $facility->description ?? '') }}</textarea>
 </div>
 

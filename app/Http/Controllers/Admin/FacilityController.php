@@ -101,7 +101,7 @@ class FacilityController extends Controller
     {
         return $request->validate([
             'name' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:255'],
-            'description' => [$isUpdate ? 'sometimes' : 'required', 'string'],
+            'description' => ['nullable', 'string'],
             'category' => ['nullable', 'string', 'max:255'],
             'location' => ['nullable', 'string', 'max:255'],
             'capacity' => ['nullable', 'integer', 'min:1'],

@@ -44,51 +44,13 @@ class Facility extends Model
             return null;
         }
 
-        $diskUrl = Storage::disk('public')->url($this->image);
-
-        $parsed = parse_url($diskUrl);
-        $host = $parsed['host'] ?? null;
-        if ($host && !in_array($host, ['localhost', '127.0.0.1', '0.0.0.0'])) {
-            if (($parsed['scheme'] ?? 'http') !== 'https') {
-                $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
-                $path = $parsed['path'] ?? '';
-                $query = isset($parsed['query']) ? '?' . $parsed['query'] : '';
-                $fragment = isset($parsed['fragment']) ? '#' . $parsed['fragment'] : '';
-
-                return "https://{$host}{$port}{$path}{$query}{$fragment}";
-            }
-
-            return $diskUrl;
+        if (Str::startsWith($this->image, ['http://', 'https://'])) {
+            $url = $this->image;
+            return Str::startsWith($url, 'http://')
+                ? preg_replace('#^http://#', 'https://', $url)
+                : $url;
         }
 
-        $relativePath = Str::startsWith($diskUrl, ['http://', 'https://'])
-            ? parse_url($diskUrl, PHP_URL_PATH) ?? $diskUrl
-            : $diskUrl;
-
-        $appUrl = config('app.url');
-        $assetUrl = config('app.asset_url');
-        $frontendUrl = config('app.frontend_url');
-        $requestHost = app()->bound('request') ? optional(request())->getSchemeAndHttpHost() : null;
-
-        $baseUrlCandidates = array_filter([
-            $assetUrl,
-            $appUrl,
-            Str::contains($requestHost, ['localhost', '127.0.0.1', '0.0.0.0']) ? $frontendUrl : $requestHost,
-        ]);
-
-        foreach ($baseUrlCandidates as $candidate) {
-            if (!$candidate) {
-                continue;
-            }
-
-            $candidateHost = parse_url($candidate, PHP_URL_HOST);
-            if ($candidateHost && in_array($candidateHost, ['localhost', '127.0.0.1', '0.0.0.0'])) {
-                continue;
-            }
-
-            return rtrim($candidate, '/') . '/' . ltrim($relativePath, '/');
-        }
-
-        return $diskUrl;
+        return url('/media/' . ltrim($this->image, '/'));
     }
 }

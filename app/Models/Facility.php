@@ -46,8 +46,18 @@ class Facility extends Model
 
         $diskUrl = Storage::disk('public')->url($this->image);
 
-        $host = parse_url($diskUrl, PHP_URL_HOST);
+        $parsed = parse_url($diskUrl);
+        $host = $parsed['host'] ?? null;
         if ($host && !in_array($host, ['localhost', '127.0.0.1', '0.0.0.0'])) {
+            if (($parsed['scheme'] ?? 'http') !== 'https') {
+                $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+                $path = $parsed['path'] ?? '';
+                $query = isset($parsed['query']) ? '?' . $parsed['query'] : '';
+                $fragment = isset($parsed['fragment']) ? '#' . $parsed['fragment'] : '';
+
+                return "https://{$host}{$port}{$path}{$query}{$fragment}";
+            }
+
             return $diskUrl;
         }
 

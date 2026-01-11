@@ -40,3 +40,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::view('/', 'admin')->name('dashboard');
     Route::resource('facilities', AdminFacilityController::class)->except(['show']);
 });
+
+Route::get('/login', function () {
+    return response()->json([
+        'message' => 'Login route placeholder',
+        'instructions' => 'Call POST /api/admins/login with credentials to authenticate.'
+    ], 200);
+})->name('login');

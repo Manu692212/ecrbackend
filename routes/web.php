@@ -1,11 +1,20 @@
 <?php
 
+use App\Http\Controllers\Admin\FacilityController as AdminFacilityController;
+use App\Models\Facility;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
 Route::get('/', function () {
-    return view('welcome');
-});
+    $facilities = Facility::query()
+        ->where('is_active', true)
+        ->orderBy('order')
+        ->orderBy('name')
+        ->take(8)
+        ->get();
+
+    return view('welcome', compact('facilities'));
+})->name('home');
 
 Route::get('/test', function () {
     return 'Test route is working!';
@@ -27,3 +36,7 @@ Route::get('/media/{path}', function (string $path) {
     return $response;
 })->where('path', '.*');
 
+Route::prefix('admin')->name('admin.')->group(function () {
+    Route::view('/', 'admin')->name('dashboard');
+    Route::resource('facilities', AdminFacilityController::class)->except(['show']);
+});

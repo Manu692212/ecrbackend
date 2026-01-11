@@ -7,10 +7,12 @@ use App\Models\Management;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\Exceptions\DriverException;
 use Intervention\Image\ImageManager;
 use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
@@ -93,17 +95,29 @@ class ManagementController extends Controller
             // Process image
             $path = $image->store('management', 'public');
             
-            // Resize image if needed
+            // Resize image if GD is available
             $fullPath = storage_path('app/public/' . $path);
-            (new ImageManager(new Driver()))
-                ->read($fullPath)
-                ->scaleDown($targetWidth, $targetHeight)
-                ->save();
+            if (extension_loaded('gd')) {
+                try {
+                    (new ImageManager(new Driver()))
+                        ->read($fullPath)
+                        ->scaleDown($targetWidth, $targetHeight)
+                        ->save();
+                } catch (DriverException $exception) {
+                    Log::warning('GD driver failed to resize management image: ' . $exception->getMessage());
+                } catch (\Throwable $exception) {
+                    Log::warning('Unexpected error while resizing management image: ' . $exception->getMessage());
+                }
+            } else {
+                Log::warning('GD extension is not available; skipping management image resizing.');
+            }
+
+            $actualDimensions = @getimagesize($fullPath);
                 
             $managementData['image'] = $path;
             $managementData['image_size'] = $imageSize;
-            $managementData['image_width'] = $targetWidth;
-            $managementData['image_height'] = $targetHeight;
+            $managementData['image_width'] = $request->image_width ?? ($actualDimensions ? (int) $actualDimensions[0] : null);
+            $managementData['image_height'] = $request->image_height ?? ($actualDimensions ? (int) $actualDimensions[1] : null);
         }
 
         $management = Management::create($managementData);

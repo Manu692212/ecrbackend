@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Facility;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -21,10 +22,12 @@ class FacilityController extends Controller
 
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        $rules = [
             'name' => 'required|string|max:255',
             'description' => 'required|string',
-            'image' => 'nullable|string|max:500',
+            'image' => $request->hasFile('image')
+                ? 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:4096'
+                : 'nullable|string|max:500',
             'icon' => 'nullable|string|max:255',
             'category' => 'nullable|string|max:255',
             'capacity' => 'nullable|integer|min:1',
@@ -33,17 +36,26 @@ class FacilityController extends Controller
             'is_featured' => 'boolean',
             'order' => 'integer|min:0',
             'is_active' => 'boolean',
-        ]);
+        ];
+
+        $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
             throw new ValidationException($validator);
+        }
+
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('facilities', 'public');
+        } elseif ($request->filled('image')) {
+            $imagePath = $request->input('image');
         }
 
         $facility = Facility::create([
             'name' => $request->name,
             'slug' => Str::slug($request->name),
             'description' => $request->description,
-            'image' => $request->image,
+            'image' => $imagePath,
             'icon' => $request->icon,
             'category' => $request->category,
             'capacity' => $request->capacity,
@@ -70,10 +82,12 @@ class FacilityController extends Controller
     {
         $facility = Facility::findOrFail($id);
         
-        $validator = Validator::make($request->all(), [
+        $rules = [
             'name' => 'sometimes|string|max:255',
             'description' => 'sometimes|string',
-            'image' => 'nullable|string|max:500',
+            'image' => $request->hasFile('image')
+                ? 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:4096'
+                : 'nullable|string|max:500',
             'icon' => 'nullable|string|max:255',
             'category' => 'nullable|string|max:255',
             'capacity' => 'sometimes|integer|min:1',
@@ -82,17 +96,28 @@ class FacilityController extends Controller
             'is_featured' => 'sometimes|boolean',
             'order' => 'sometimes|integer|min:0',
             'is_active' => 'sometimes|boolean',
-        ]);
+        ];
+
+        $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
             throw new ValidationException($validator);
         }
 
+        $data = $request->all();
+
         if ($request->has('name')) {
-            $request->merge(['slug' => Str::slug($request->name)]);
+            $data['slug'] = Str::slug($request->name);
         }
 
-        $facility->update($request->all());
+        if ($request->hasFile('image')) {
+            if ($facility->image) {
+                Storage::disk('public')->delete($facility->image);
+            }
+            $data['image'] = $request->file('image')->store('facilities', 'public');
+        }
+
+        $facility->update($data);
 
         return response()->json([
             'message' => 'Facility updated successfully',

@@ -55,14 +55,30 @@ class Facility extends Model
             ? parse_url($diskUrl, PHP_URL_PATH) ?? $diskUrl
             : $diskUrl;
 
-        $baseUrl = config('app.asset_url')
-            ?? config('app.url')
-            ?? (app()->bound('request') ? optional(request())->getSchemeAndHttpHost() : null);
+        $appUrl = config('app.url');
+        $assetUrl = config('app.asset_url');
+        $frontendUrl = config('app.frontend_url');
+        $requestHost = app()->bound('request') ? optional(request())->getSchemeAndHttpHost() : null;
 
-        if (!$baseUrl) {
-            return $diskUrl;
+        $baseUrlCandidates = array_filter([
+            $assetUrl,
+            $appUrl,
+            Str::contains($requestHost, ['localhost', '127.0.0.1', '0.0.0.0']) ? $frontendUrl : $requestHost,
+        ]);
+
+        foreach ($baseUrlCandidates as $candidate) {
+            if (!$candidate) {
+                continue;
+            }
+
+            $candidateHost = parse_url($candidate, PHP_URL_HOST);
+            if ($candidateHost && in_array($candidateHost, ['localhost', '127.0.0.1', '0.0.0.0'])) {
+                continue;
+            }
+
+            return rtrim($candidate, '/') . '/' . ltrim($relativePath, '/');
         }
 
-        return rtrim($baseUrl, '/') . '/' . ltrim($relativePath, '/');
+        return $diskUrl;
     }
 }

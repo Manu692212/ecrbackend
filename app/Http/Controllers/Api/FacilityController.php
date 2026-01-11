@@ -132,4 +132,18 @@ class FacilityController extends Controller
 
         return response()->json(['message' => 'Facility deleted successfully']);
     }
+
+    public function publicList()
+    {
+        try {
+            $facilities = Facility::where('is_active', true)
+                ->orderBy('order', 'asc')
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            return response()->json($facilities);
+        } catch (\Exception $e) {
+            return response()->json([]);
+        }
+    }
 }

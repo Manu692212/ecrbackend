@@ -21,6 +21,7 @@ Route::middleware('api')->group(function () {
     Route::get('public/settings/group/{group}', [SettingController::class, 'getPublicByGroup']);
     Route::get('public/academic-council', [AcademicCouncilController::class, 'publicList']);
     Route::get('public/management', [ManagementController::class, 'publicList']);
+    Route::get('public/facilities', [FacilityController::class, 'publicList']);
     
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {

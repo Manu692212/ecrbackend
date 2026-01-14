@@ -4,12 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
+use App\Services\SmtpConfigService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class SettingController extends Controller
 {
+    public function __construct(private readonly SmtpConfigService $smtpConfigService)
+    {
+    }
+
     public function index(Request $request)
     {
         $query = Setting::query();
@@ -53,6 +58,8 @@ class SettingController extends Controller
             'is_public' => $request->is_public ?? false,
         ]);
 
+        $this->refreshSmtpConfigIfNeeded($setting->key);
+
         return response()->json([
             'message' => 'Setting created successfully',
             'setting' => $setting
@@ -84,6 +91,8 @@ class SettingController extends Controller
 
         $setting->update($request->all());
 
+        $this->refreshSmtpConfigIfNeeded($setting->key);
+
         return response()->json([
             'message' => 'Setting updated successfully',
             'setting' => $setting
@@ -93,7 +102,10 @@ class SettingController extends Controller
     public function destroy(string $id)
     {
         $setting = Setting::findOrFail($id);
+        $key = $setting->key;
         $setting->delete();
+
+        $this->refreshSmtpConfigIfNeeded($key);
 
         return response()->json(['message' => 'Setting deleted successfully']);
     }
@@ -131,5 +143,14 @@ class SettingController extends Controller
             // Table might not exist yet - return empty array
             return response()->json([]);
         }
+    }
+
+    private function refreshSmtpConfigIfNeeded(?string $key): void
+    {
+        if (!$key || !str_starts_with($key, 'smtp.')) {
+            return;
+        }
+
+        $this->smtpConfigService->apply();
     }
 }

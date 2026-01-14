@@ -9,6 +9,7 @@ use App\Models\OtpToken;
 use App\Services\OtpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -192,13 +193,29 @@ class AdminController extends Controller
             ['intent' => 'forgot_password', 'ip' => $request->ip()]
         );
 
-        Mail::to($admin->email)
-            ->send(new OtpMail(
-                $issued['code'],
-                'Password Reset',
-                OtpService::DEFAULT_TTL_SECONDS,
-                $issued['token']->metadata
-            ));
+        try {
+            Mail::to($admin->email)
+                ->send(new OtpMail(
+                    $issued['code'],
+                    'Password Reset',
+                    OtpService::DEFAULT_TTL_SECONDS,
+                    $issued['token']->metadata
+                ));
+        } catch (\Throwable $e) {
+            Log::error('Failed to send password reset OTP email', [
+                'admin_id' => $admin->id,
+                'email' => $admin->email,
+                'otp_token' => $issued['token']->id,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+
+            $issued['token']->delete();
+
+            return response()->json([
+                'message' => 'Unable to send OTP email at this time',
+            ], 503);
+        }
 
         return response()->json([
             'message' => 'OTP sent to registered email',
@@ -271,13 +288,29 @@ class AdminController extends Controller
             ['intent' => 'password_change', 'ip' => $request->ip()]
         );
 
-        Mail::to($admin->email)
-            ->send(new OtpMail(
-                $issued['code'],
-                'Password Change',
-                OtpService::DEFAULT_TTL_SECONDS,
-                $issued['token']->metadata
-            ));
+        try {
+            Mail::to($admin->email)
+                ->send(new OtpMail(
+                    $issued['code'],
+                    'Password Change',
+                    OtpService::DEFAULT_TTL_SECONDS,
+                    $issued['token']->metadata
+                ));
+        } catch (\Throwable $e) {
+            Log::error('Failed to send password change OTP email', [
+                'admin_id' => $admin->id,
+                'email' => $admin->email,
+                'otp_token' => $issued['token']->id,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+
+            $issued['token']->delete();
+
+            return response()->json([
+                'message' => 'Unable to send OTP email at this time',
+            ], 503);
+        }
 
         return response()->json([
             'message' => 'OTP sent to registered email',

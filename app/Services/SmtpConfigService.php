@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Setting;
+use Illuminate\Mail\MailManager;
 use Illuminate\Support\Facades\Schema;
 
 class SmtpConfigService
@@ -13,14 +14,48 @@ class SmtpConfigService
             return;
         }
 
+        $mailer = $this->getMailer();
+
         $config = $this->buildMailerConfig();
 
         config([
-            'mail.default' => $this->getSetting('smtp.mailer', config('mail.default', 'smtp')),
+            'mail.default' => $mailer,
             'mail.mailers.smtp' => array_merge(config('mail.mailers.smtp', []), $config),
             'mail.from.address' => $this->getSenderEmail(),
             'mail.from.name' => $this->getSenderName(),
         ]);
+
+        try {
+            app(MailManager::class)->forgetMailers();
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        if ($mailer === 'resend') {
+            $resendKey = $this->getSetting('smtp.resend_api_key', env('RESEND_API_KEY'));
+            if ($resendKey) {
+                config([
+                    'services.resend.key' => $resendKey,
+                ]);
+            }
+        }
+    }
+
+    private function getMailer(): string
+    {
+        $mailer = $this->getSetting('smtp.mailer', config('mail.default', 'smtp'));
+        $mailer = is_string($mailer) ? trim($mailer) : '';
+
+        if ($mailer === '') {
+            return 'smtp';
+        }
+
+        $availableMailers = array_keys((array) config('mail.mailers', []));
+        if (!in_array($mailer, $availableMailers, true)) {
+            return 'smtp';
+        }
+
+        return $mailer;
     }
 
     public function getSenderEmail(): string
@@ -60,6 +95,10 @@ class SmtpConfigService
     {
         $scheme = $this->getSetting('smtp.scheme', env('MAIL_SCHEME'));
         $encryption = $this->getSetting('smtp.encryption', env('MAIL_ENCRYPTION'));
+
+        if (!$scheme && $encryption) {
+            $scheme = $encryption;
+        }
 
         return [
             'transport' => 'smtp',

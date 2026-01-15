@@ -22,6 +22,7 @@ Route::middleware('api')->group(function () {
     Route::post('admins/login/verify', [AdminController::class, 'verifyLoginOtp']);
     Route::post('admins/forgot-password', [AdminController::class, 'requestPasswordReset']);
     Route::post('admins/forgot-password/verify', [AdminController::class, 'resetPassword']);
+    Route::get('settings/key/{key}', [SettingController::class, 'getByKey']);
     Route::get('public/settings/group/{group}', [SettingController::class, 'getPublicByGroup']);
     Route::get('public/academic-council', [AcademicCouncilController::class, 'publicList']);
     Route::get('public/management', [ManagementController::class, 'publicList']);
@@ -91,7 +92,6 @@ Route::middleware('api')->group(function () {
         
         // Settings routes
         Route::apiResource('settings', SettingController::class);
-        Route::get('settings/key/{key}', [SettingController::class, 'getByKey']);
         Route::get('settings/group/{group}', [SettingController::class, 'getByGroup']);
 
         // Authenticated password change with OTP

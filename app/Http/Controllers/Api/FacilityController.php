@@ -25,7 +25,7 @@ class FacilityController extends Controller
     {
         $rules = [
             'name' => 'required|string|max:255',
-            'description' => 'required|string',
+            'description' => 'nullable|string',
             'image' => $request->hasFile('image')
                 ? 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:4096'
                 : 'nullable|string|max:500',
@@ -88,7 +88,7 @@ class FacilityController extends Controller
         
         $rules = [
             'name' => 'sometimes|string|max:255',
-            'description' => 'sometimes|string',
+            'description' => 'sometimes|nullable|string',
             'image' => $request->hasFile('image')
                 ? 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:4096'
                 : 'nullable|string|max:500',

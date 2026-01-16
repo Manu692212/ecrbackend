@@ -7,12 +7,15 @@ use App\Mail\OtpMail;
 use App\Models\Admin;
 use App\Models\OtpToken;
 use App\Services\OtpService;
+use Firebase\JWT\JWT;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class AdminController extends Controller
 {
@@ -113,14 +116,7 @@ class AdminController extends Controller
             return response()->json(['message' => 'Account is deactivated'], 401);
         }
 
-        // Create a token for the admin
-        $token = $admin->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'message' => 'Login successful',
-            'token' => $token,
-            'admin' => $admin->only(['id', 'name', 'email', 'role'])
-        ]);
+        return $this->respondWithToken($admin);
     }
 
     public function verifyLoginOtp(Request $request, OtpService $otpService)
@@ -157,14 +153,9 @@ class AdminController extends Controller
             return response()->json(['message' => 'Account is deactivated'], 401);
         }
 
-        $sanctumToken = $admin->createToken('admin-token')->plainTextToken;
         $token->delete();
 
-        return response()->json([
-            'message' => 'Login successful',
-            'admin' => $admin->only(['id', 'name', 'email', 'role']),
-            'token' => $sanctumToken,
-        ]);
+        return $this->respondWithToken($admin);
     }
 
     public function requestPasswordReset(Request $request, OtpService $otpService)
@@ -260,16 +251,9 @@ class AdminController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
-        // Revoke all existing tokens for security
-        $admin->tokens()->delete();
-        $newToken = $admin->createToken('admin-token')->plainTextToken;
         $token->delete();
 
-        return response()->json([
-            'message' => 'Password reset successful',
-            'token' => $newToken,
-            'admin' => $admin->only(['id', 'name', 'email', 'role']),
-        ]);
+        return $this->respondWithToken($admin, 'Password reset successful');
     }
 
     public function requestPasswordChangeOtp(Request $request, OtpService $otpService)
@@ -357,14 +341,170 @@ class AdminController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
-        $admin->tokens()->delete();
-        $newToken = $admin->createToken('admin-token')->plainTextToken;
         $token->delete();
 
-        return response()->json([
-            'message' => 'Password updated successfully',
-            'token' => $newToken,
-            'admin' => $admin->only(['id', 'name', 'email', 'role']),
+        return $this->respondWithToken($admin, 'Password updated successfully');
+    }
+
+    public function requestEmailChangeOtp(Request $request, OtpService $otpService)
+    {
+        $admin = $request->user();
+
+        if (!$admin) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'new_email' => [
+                'required',
+                'email',
+                Rule::unique('admins', 'email')->ignore($admin->id),
+            ],
         ]);
+
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+
+        $newEmail = $request->new_email;
+
+        if ($newEmail === $admin->email) {
+            return response()->json(['message' => 'New email must be different from current email'], 422);
+        }
+
+        $issued = $otpService->issue(
+            $newEmail,
+            'email_change',
+            $admin,
+            OtpService::DEFAULT_TTL_SECONDS,
+            ['intent' => 'email_change', 'ip' => $request->ip(), 'new_email' => $newEmail, 'old_email' => $admin->email]
+        );
+
+        try {
+            Mail::to($newEmail)
+                ->send(new OtpMail(
+                    $issued['code'],
+                    'Email Change',
+                    OtpService::DEFAULT_TTL_SECONDS,
+                    $issued['token']->metadata
+                ));
+        } catch (\Throwable $e) {
+            Log::error('Failed to send email change OTP email', [
+                'admin_id' => $admin->id,
+                'email' => $newEmail,
+                'otp_token' => $issued['token']->id,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+
+            $issued['token']->delete();
+
+            return response()->json([
+                'message' => 'Unable to send OTP email at this time',
+            ], 503);
+        }
+
+        return response()->json([
+            'message' => 'OTP sent to new email',
+            'otp_token' => $issued['token']->id,
+            'expires_in' => OtpService::DEFAULT_TTL_SECONDS,
+        ]);
+    }
+
+    public function changeEmailWithOtp(Request $request, OtpService $otpService)
+    {
+        $admin = $request->user();
+
+        if (!$admin) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'otp_token' => 'required|string',
+            'code' => 'required|string|min:4|max:10',
+            'new_email' => [
+                'required',
+                'email',
+                Rule::unique('admins', 'email')->ignore($admin->id),
+            ],
+        ]);
+
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+
+        /** @var OtpToken|null $token */
+        $token = OtpToken::where('id', $request->otp_token)
+            ->where('context', 'email_change')
+            ->first();
+
+        if (
+            !$token ||
+            $token->admin_id !== $admin->id
+        ) {
+            return response()->json(['message' => 'OTP expired or invalid'], 410);
+        }
+
+        if ($token->email !== $request->new_email) {
+            return response()->json(['message' => 'OTP was issued for a different email address'], 422);
+        }
+
+        if (!$otpService->verify($token, $request->code)) {
+            return response()->json(['message' => 'Invalid or expired OTP'], 422);
+        }
+
+        $admin->update([
+            'email' => $request->new_email,
+        ]);
+
+        $token->delete();
+
+        return $this->respondWithToken($admin, 'Email updated successfully');
+    }
+
+    protected function respondWithToken(Admin $admin, string $message = 'Login successful')
+    {
+        $token = $this->issueJwt($admin);
+
+        return response()->json([
+            'message' => $message,
+            'token' => $token,
+            'token_type' => 'Bearer',
+            'expires_in' => $this->jwtConfig()['ttl'],
+            'admin' => $admin->only(['id', 'name', 'email', 'role'])
+        ]);
+    }
+
+    protected function issueJwt(Admin $admin): string
+    {
+        $config = $this->jwtConfig();
+
+        $issuedAt = now();
+        $expiresAt = $issuedAt->copy()->addSeconds($config['ttl']);
+
+        $payload = [
+            'iss' => config('app.url'),
+            'sub' => $admin->id,
+            'role' => $admin->role,
+            'iat' => $issuedAt->timestamp,
+            'exp' => $expiresAt->timestamp,
+        ];
+
+        return JWT::encode($payload, $config['secret'], $config['algo']);
+    }
+
+    protected function jwtConfig(): array
+    {
+        $config = config('admin.jwt');
+
+        if (empty($config['secret'])) {
+            throw new RuntimeException('Admin JWT secret is not configured.');
+        }
+
+        return [
+            'secret' => $config['secret'],
+            'ttl' => (int) ($config['ttl'] ?? 86400),
+            'algo' => $config['algo'] ?? 'HS256',
+        ];
     }
 }

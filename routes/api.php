@@ -30,7 +30,7 @@ Route::middleware('api')->group(function () {
     Route::post('public/applications', [ApplicationSubmissionController::class, 'publicStore']);
     
     // Protected routes
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware('admin.jwt')->group(function () {
         // Admin routes
         Route::apiResource('admins', AdminController::class);
         
@@ -97,5 +97,9 @@ Route::middleware('api')->group(function () {
         // Authenticated password change with OTP
         Route::post('admins/password-change/request-otp', [AdminController::class, 'requestPasswordChangeOtp']);
         Route::post('admins/password-change/verify', [AdminController::class, 'changePasswordWithOtp']);
+
+        // Authenticated email change with OTP
+        Route::post('admins/email-change/request-otp', [AdminController::class, 'requestEmailChangeOtp']);
+        Route::post('admins/email-change/verify', [AdminController::class, 'changeEmailWithOtp']);
     });
 });

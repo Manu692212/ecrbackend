@@ -58,7 +58,7 @@ class FacilityController extends Controller
 
         $facility = Facility::create(array_merge([
             'name' => $request->name,
-            'slug' => Str::slug($request->name),
+            'slug' => $this->generateUniqueSlug($request->name),
             'description' => $request->description,
             'icon' => $request->icon,
             'category' => $request->category,
@@ -111,7 +111,7 @@ class FacilityController extends Controller
         $data = $request->all();
 
         if ($request->has('name')) {
-            $data['slug'] = Str::slug($request->name);
+            $data['slug'] = $this->generateUniqueSlug($request->name, $facility->id);
         }
 
         if ($request->hasFile('image')) {
@@ -192,5 +192,23 @@ class FacilityController extends Controller
             'image_mime' => $image->getMimeType() ?: $image->getClientMimeType(),
             'image' => null,
         ];
+    }
+
+    private function generateUniqueSlug(string $name, ?int $ignoreId = null): string
+    {
+        $baseSlug = Str::slug($name) ?: 'facility';
+        $slug = $baseSlug;
+        $counter = 1;
+
+        while (
+            Facility::where('slug', $slug)
+                ->when($ignoreId, fn($query) => $query->where('id', '!=', $ignoreId))
+                ->exists()
+        ) {
+            $slug = $baseSlug . '-' . $counter;
+            $counter++;
+        }
+
+        return $slug;
     }
 }
